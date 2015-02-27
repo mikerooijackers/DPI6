@@ -11,6 +11,7 @@ import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.jms.TextMessage;
+import messaging.MessagingGateway;
 
 /**
  *
@@ -37,7 +38,7 @@ abstract class loanBrokerGateway {
 
     abstract void onBankReply(BankQuoteReply r);
     
-    void requestQuote(BankQuoteRequest r){
+    void requestQuote(BankQuoteRequest r) throws JMSException{
         String serR = sr.requestToString(r);
         Message msg = msgGtw.createMsg(serR);
         msgGtw.send(msg);        
