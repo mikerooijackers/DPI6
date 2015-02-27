@@ -93,6 +93,7 @@ public class LoanTestClient {
             ex.printStackTrace();
         }
     }
+    
     /**
      * This message is called whenever a new client reply message arrives.
      *  The message is de-serialized into a ClientReply, and the reply is shown in the GUI.
