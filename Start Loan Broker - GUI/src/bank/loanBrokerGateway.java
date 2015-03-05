@@ -5,6 +5,7 @@
  */
 package bank;
 
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.jms.JMSException;
@@ -12,36 +13,54 @@ import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.jms.TextMessage;
 import messaging.MessagingGateway;
+import messaging.MessagingGateway.CallBack;
 
 /**
  *
  * @author Daan
  */
-abstract class loanBrokerGateway {
+public class LoanBrokerGateway {
 
-    MessagingGateway msgGtw;
-    BankSerializer sr;
+    private final MessagingGateway gateway;
+    private BankSerializer serializer;
+    
+    private ArrayList<CallBack<BankQuoteRequest>> callbacks;
 
-    loanBrokerGateway() {
-        msgGtw.setListener(new MessageListener() {
+    public LoanBrokerGateway(String requestQueue, String replyQueue) {
+        this.gateway = new MessagingGateway(requestQueue, replyQueue);
+        this.serializer = new BankSerializer();
+
+        this.callbacks = new ArrayList<CallBack<BankQuoteRequest>>();
+
+        this.gateway.setListener(new MessageListener() {
             public void onMessage(Message msg) {
                 try {
-                    String body = ((TextMessage) msg).getText();
-                    BankQuoteReply reply = sr.replyFromString(body);
-                    onBankReply(reply);
+                    BankQuoteRequest req = 
+                            serializer.requestFromString(
+                                    ((TextMessage) msg)
+                                            .getText());
+                    for (CallBack<BankQuoteRequest> callback : callbacks) {
+                        callback.call(req);
+                    }
                 } catch (JMSException ex) {
-                    Logger.getLogger(loanBrokerGateway.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(LoanBrokerGateway.class.getName())
+                            .log(Level.SEVERE, null, ex);
                 }
             }
         });
     }
-
-    abstract void onBankReply(BankQuoteReply r);
     
-    void requestQuote(BankQuoteRequest r) throws JMSException{
-        String serR = sr.requestToString(r);
-        Message msg = msgGtw.createMsg(serR);
-        msgGtw.send(msg);        
+    public void addListener(CallBack<BankQuoteRequest> listener) {
+        this.callbacks.add(listener);
     }
     
+    public void sendReply(BankQuoteReply reply) {
+        Message msg = this.gateway.createMsg(
+                this.serializer.replyToString(reply));
+        this.gateway.send(msg);
+    }
+    
+    public void start() {
+        this.gateway.start();
+    }
 }

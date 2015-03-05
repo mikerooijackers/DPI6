@@ -5,41 +5,62 @@
  */
 package creditbureau;
 
+import java.util.ArrayList;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.jms.TextMessage;
 import messaging.MessagingGateway;
+import messaging.MessagingGateway.CallBack;
 
 /**
  *
  * @author mikerooijackers
  */
-abstract class LoanBrokerGateway {
+public class LoanBrokerGateway {
 
-    MessagingGateway msgGtw;
-    CreditSerializer creditSerializer;
+    private final MessagingGateway gateway;
+    private CreditSerializer serializer;
+    
+    private ArrayList<CallBack<CreditRequest>> callbacks;
 
-    public LoanBrokerGateway() {
-        msgGtw.setListener(new MessageListener() {
+    public LoanBrokerGateway(String requestQueue, String replyQueue) {
+        this.gateway = new MessagingGateway(replyQueue, requestQueue);
+        this.serializer = new CreditSerializer();
+
+        this.callbacks = new ArrayList<CallBack<CreditRequest>>();
+
+        this.gateway.setListener(new MessageListener() {
             public void onMessage(Message msg) {
                 try {
-                    String body = ((TextMessage) msg).getText();
-                    CreditReply reply = creditSerializer.replyFromString(body);
-                    onCredit(reply);
+                    CreditRequest req = 
+                            serializer.requestFromString(
+                                    ((TextMessage) msg)
+                                            .getText());
+                    for (CallBack<CreditRequest> callback : callbacks) {
+                        callback.call(req);
+                    }
                 } catch (JMSException ex) {
-                    java.util.logging.Logger.getLogger(LoanBrokerGateway.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(LoanBrokerGateway.class.getName())
+                            .log(Level.SEVERE, null, ex);
                 }
             }
         });
     }
-
-    abstract void onCreditReply(CreditReply creditReply);
-
-    void onCredit(CreditReply reply) throws JMSException {
-        String serR = creditSerializer.replyToString(reply);
-        Message msg = msgGtw.createMsg(serR);
-        msgGtw.send(msg);
+    
+    public void addListener(CallBack<CreditRequest> listener) {
+        this.callbacks.add(listener);
+    }
+    
+    public void sendReply(CreditReply reply) {
+        Message msg = this.gateway.createMsg(
+                this.serializer.replyToString(reply));
+        this.gateway.send(msg);
+    }
+    
+    public void start() {
+        this.gateway.start();
     }
 }

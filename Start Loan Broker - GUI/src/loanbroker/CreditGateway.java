@@ -3,8 +3,11 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package client;
+package loanbroker;
 
+import creditbureau.CreditReply;
+import creditbureau.CreditRequest;
+import creditbureau.CreditSerializer;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -12,48 +15,49 @@ import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.jms.TextMessage;
-import messaging.MessagingGateway;
 import messaging.MessagingGateway.CallBack;
+import messaging.MessagingGateway;
 
 /**
  *
  * @author mikerooijackers
  */
-public class LoanBrokerGateway {
+public class CreditGateway {
     
     private final MessagingGateway gateway;
-    private final ClientSerializer serializer;
+    private CreditSerializer serializer;
     
-    private ArrayList<CallBack<ClientReply>> callbacks;
+    private ArrayList<CallBack<CreditReply>> callbacks;
 
-    public LoanBrokerGateway(String requestQueue, String replyQueue) {
-        this.gateway = new MessagingGateway(requestQueue, replyQueue);
-        this.serializer = new ClientSerializer();
-        
-        this.callbacks = new ArrayList<CallBack<ClientReply>>();
+    public CreditGateway(String requestQueue, String replyQueue) {
+        this.gateway = new MessagingGateway(replyQueue, requestQueue);
+        this.serializer = new CreditSerializer();
+
+        this.callbacks = new ArrayList<CallBack<CreditReply>>();
+
         this.gateway.setListener(new MessageListener() {
             public void onMessage(Message msg) {
                 try {
-                    ClientReply req = 
+                    CreditReply req = 
                             serializer.replyFromString(
                                     ((TextMessage) msg)
                                             .getText());
-                    for (CallBack<ClientReply> callback : callbacks) {
+                    for (CallBack<CreditReply> callback : callbacks) {
                         callback.call(req);
                     }
                 } catch (JMSException ex) {
-                    Logger.getLogger(LoanBrokerGateway.class.getName())
+                    Logger.getLogger(CreditGateway.class.getName())
                             .log(Level.SEVERE, null, ex);
                 }
             }
         });
     }
     
-    public void addListener(CallBack<ClientReply> listener) {
+    public void addListener(CallBack<CreditReply> listener) {
         this.callbacks.add(listener);
     }
     
-    public void sendRequest(ClientRequest request) {
+    public void sendRequest(CreditRequest request) {
         Message msg = this.gateway.createMsg(
                 this.serializer.requestToString(request));
         this.gateway.send(msg);
@@ -62,5 +66,4 @@ public class LoanBrokerGateway {
     public void start() {
         this.gateway.start();
     }
-    
 }

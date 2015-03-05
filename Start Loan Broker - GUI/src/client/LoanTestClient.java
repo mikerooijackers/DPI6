@@ -1,19 +1,7 @@
 package client;
 
+import messaging.MessagingGateway.CallBack;
 import client.gui.ClientFrame;
-import java.util.Properties;
-import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
-import javax.jms.MessageProducer;
-import javax.jms.Session;
-import javax.jms.TextMessage;
-import javax.naming.Context;
-import javax.naming.InitialContext;
 
 /**
  * This class represents one Client Application.
@@ -24,46 +12,27 @@ import javax.naming.InitialContext;
  * 
  */
 public class LoanTestClient {
-
-    /*
-     * Connection to JMS
-     */
-    private final Connection connection; // to connect to the JMS
-    protected Session session; // session for making messages, producers and consumers
-
-    private final MessageProducer producer; // for sending messages
-    private final MessageConsumer consumer; // for receiving messages
-
-    private final ClientSerializer serializer; // for serializing ClientRequest and ClientReply to/from XML
-    
+    private final LoanBrokerGateway gateway;
     private ClientFrame frame; // GUI
 
+    /**
+     * Create a loan test client.
+     * @param name The name of the window.
+     * @param requestQueue The queueu to get requests from.
+     * @param replyQueue The queue to send replies over.
+     * @throws Exception Possible jms exceptions or ui exceptions.
+     */
     public LoanTestClient(String name, String requestQueue, String replyQueue) throws Exception {
         super();
-        Properties props = new Properties();
-        props.setProperty(Context.INITIAL_CONTEXT_FACTORY,"org.apache.activemq.jndi.ActiveMQInitialContextFactory");
-        props.setProperty(Context.PROVIDER_URL,"tcp://localhost:61616");
-        props.put( ( "queue." + requestQueue ) ,requestQueue);
-        props.put( ( "queue." + replyQueue ) ,replyQueue);        
-        Context jndiContext = new InitialContext(props);
-       
-        ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
-        connection = connectionFactory.createConnection();
-        session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-        // connect to the sender channel
-        Destination senderDestination = (Destination) jndiContext.lookup(requestQueue);
-        producer = session.createProducer(senderDestination);
-        // connect to the receiver channel
-        Destination receiverDestination = (Destination) jndiContext.lookup(replyQueue);
-        consumer = session.createConsumer(receiverDestination);
-        consumer.setMessageListener(new MessageListener() {
-
-            public void onMessage(Message message) {
-                processLoanOffer((TextMessage) message);
+        
+        this.gateway = new LoanBrokerGateway(requestQueue, replyQueue);
+        
+        this.gateway.addListener(new CallBack<ClientReply>() {
+            public void call(ClientReply val) {
+                processLoanOffer(val);
             }
         });
-         // create the serializer
-        serializer = new ClientSerializer();
+        
          // create the GUI
         frame = new ClientFrame(name) {
 
@@ -81,40 +50,27 @@ public class LoanTestClient {
             }
         });
     }
+    
     /**
      * Sends new loan request to the LoanBroker.
      * @param request
      */
     public void sendRequest(ClientRequest request) {
-        try {
-            producer.send(session.createTextMessage(serializer.requestToString(request)));
-            frame.addRequest(request);
-        } catch (JMSException ex) {
-            ex.printStackTrace();
-        }
+        this.gateway.sendRequest(request);
+        this.frame.addRequest(request);
     }
-    
     /**
      * This message is called whenever a new client reply message arrives.
      *  The message is de-serialized into a ClientReply, and the reply is shown in the GUI.
      * @param message
      */
-    private void processLoanOffer(TextMessage message) {
-        try {
-            ClientReply reply = serializer.replyFromString(((TextMessage) message).getText());
-            frame.addReply(null, reply);
-        } catch (JMSException ex) {
-            ex.printStackTrace();
-        }
+    private void processLoanOffer(ClientReply reply) {
+        frame.addReply(null, reply);
     }
     /**
      * Opens connection to JMS,so that messages can be send and received.
      */
     public void start() {
-        try {
-            connection.start();
-        } catch (JMSException ex) {
-            ex.printStackTrace();
-        }
+        this.gateway.start();
     }
 }

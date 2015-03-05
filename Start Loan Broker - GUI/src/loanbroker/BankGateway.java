@@ -3,8 +3,11 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package client;
+package loanbroker;
 
+import bank.BankQuoteReply;
+import bank.BankQuoteRequest;
+import bank.BankSerializer;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -19,41 +22,42 @@ import messaging.MessagingGateway.CallBack;
  *
  * @author mikerooijackers
  */
-public class LoanBrokerGateway {
+public class BankGateway {
     
     private final MessagingGateway gateway;
-    private final ClientSerializer serializer;
+    private BankSerializer serializer;
     
-    private ArrayList<CallBack<ClientReply>> callbacks;
+    private ArrayList<CallBack<BankQuoteReply>> callbacks;
 
-    public LoanBrokerGateway(String requestQueue, String replyQueue) {
-        this.gateway = new MessagingGateway(requestQueue, replyQueue);
-        this.serializer = new ClientSerializer();
-        
-        this.callbacks = new ArrayList<CallBack<ClientReply>>();
+    public BankGateway(String requestQueue, String replyQueue) {
+        this.gateway = new MessagingGateway(replyQueue, requestQueue);
+        this.serializer = new BankSerializer();
+
+        this.callbacks = new ArrayList<CallBack<BankQuoteReply>>();
+
         this.gateway.setListener(new MessageListener() {
             public void onMessage(Message msg) {
                 try {
-                    ClientReply req = 
+                    BankQuoteReply req = 
                             serializer.replyFromString(
                                     ((TextMessage) msg)
                                             .getText());
-                    for (CallBack<ClientReply> callback : callbacks) {
+                    for (CallBack<BankQuoteReply> callback : callbacks) {
                         callback.call(req);
                     }
                 } catch (JMSException ex) {
-                    Logger.getLogger(LoanBrokerGateway.class.getName())
+                    Logger.getLogger(BankGateway.class.getName())
                             .log(Level.SEVERE, null, ex);
                 }
             }
         });
     }
     
-    public void addListener(CallBack<ClientReply> listener) {
+    public void addListener(CallBack<BankQuoteReply> listener) {
         this.callbacks.add(listener);
     }
     
-    public void sendRequest(ClientRequest request) {
+    public void sendRequest(BankQuoteRequest request) {
         Message msg = this.gateway.createMsg(
                 this.serializer.requestToString(request));
         this.gateway.send(msg);
@@ -62,5 +66,5 @@ public class LoanBrokerGateway {
     public void start() {
         this.gateway.start();
     }
-    
+
 }

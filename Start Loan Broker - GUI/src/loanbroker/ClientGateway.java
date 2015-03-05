@@ -3,8 +3,11 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package client;
+package loanbroker;
 
+import client.ClientReply;
+import client.ClientRequest;
+import client.ClientSerializer;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -19,48 +22,48 @@ import messaging.MessagingGateway.CallBack;
  *
  * @author mikerooijackers
  */
-public class LoanBrokerGateway {
+public class ClientGateway {
     
     private final MessagingGateway gateway;
-    private final ClientSerializer serializer;
+    private ClientSerializer serializer;
     
-    private ArrayList<CallBack<ClientReply>> callbacks;
+    private ArrayList<CallBack<ClientRequest>> callbacks;
 
-    public LoanBrokerGateway(String requestQueue, String replyQueue) {
-        this.gateway = new MessagingGateway(requestQueue, replyQueue);
+    public ClientGateway(String requestQueue, String replyQueue) {
+        this.gateway = new MessagingGateway(replyQueue, requestQueue);
         this.serializer = new ClientSerializer();
-        
-        this.callbacks = new ArrayList<CallBack<ClientReply>>();
+
+        this.callbacks = new ArrayList<CallBack<ClientRequest>>();
+
         this.gateway.setListener(new MessageListener() {
             public void onMessage(Message msg) {
                 try {
-                    ClientReply req = 
-                            serializer.replyFromString(
+                    ClientRequest req = 
+                            serializer.requestFromString(
                                     ((TextMessage) msg)
                                             .getText());
-                    for (CallBack<ClientReply> callback : callbacks) {
+                    for (CallBack<ClientRequest> callback : callbacks) {
                         callback.call(req);
                     }
                 } catch (JMSException ex) {
-                    Logger.getLogger(LoanBrokerGateway.class.getName())
+                    Logger.getLogger(ClientGateway.class.getName())
                             .log(Level.SEVERE, null, ex);
                 }
             }
         });
     }
     
-    public void addListener(CallBack<ClientReply> listener) {
+    public void addListener(CallBack<ClientRequest> listener) {
         this.callbacks.add(listener);
     }
     
-    public void sendRequest(ClientRequest request) {
+    public void sendReply(ClientReply reply) {
         Message msg = this.gateway.createMsg(
-                this.serializer.requestToString(request));
+                this.serializer.replyToString(reply));
         this.gateway.send(msg);
     }
     
     public void start() {
         this.gateway.start();
     }
-    
 }

@@ -1,24 +1,10 @@
 package bank;
 
 import bank.gui.BankFrame;
-import java.util.Properties;
 import java.util.Random;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
-import javax.jms.MessageProducer;
-import javax.jms.Session;
-import javax.jms.TextMessage;
-import javax.naming.Context;
-import javax.naming.InitialContext;
 import main.JMSSettings;
 import main.JMSSettings.RunMode;
+import messaging.MessagingGateway.CallBack;
 
 /**
  * This class represents one Bank Application.
@@ -38,46 +24,23 @@ public class Bank {
     private int quoteCounter = 0;
     protected Random random = new Random();
     private BankFrame frame; // GUI
-    private final BankSerializer serializer; // serializer BankQuoteRequest BankQuoteReply to/from XML:
+
     /**
      * attributes for connection to JMS
      */
-    private final Connection connection; // connection to the JMS server
-    protected Session session; // JMS session for creating producers, consumers and messages
-    private final MessageProducer producer; // producer for sending messages
-    private final MessageConsumer consumer; // consumer for receiving messages
-
+    private final LoanBrokerGateway gateway;
+    
     public Bank(String bankName, String bankRequestQueue, String bankReplyQueue) throws Exception {
         super();
         this.name = bankName;
-        // connect to JMS
-        Properties props = new Properties();
-        props.setProperty(Context.INITIAL_CONTEXT_FACTORY,"org.apache.activemq.jndi.ActiveMQInitialContextFactory");
-        props.setProperty(Context.PROVIDER_URL,"tcp://localhost:61616");
-        props.put( ( "queue." + bankRequestQueue ) ,bankRequestQueue);
-        props.put( ( "queue." + bankReplyQueue ) ,bankReplyQueue);        
-        Context jndiContext = new InitialContext(props);
-       
-        ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
-        connection = connectionFactory.createConnection();
-        session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        
+        this.gateway = new LoanBrokerGateway(bankReplyQueue, bankRequestQueue) {};
 
-        // connect to the sender channel
-        Destination senderDestination = (Destination) jndiContext.lookup(bankReplyQueue);
-        producer = session.createProducer(senderDestination);
-
-        // connect to the receiver channel and register as a listener on it
-        Destination receiverDestination = (Destination) jndiContext.lookup(bankRequestQueue);
-        consumer = session.createConsumer(receiverDestination);
-        consumer.setMessageListener(new MessageListener() {
-
-            public void onMessage(Message msg) {
-                onBankQuoteRequest((TextMessage) msg);
+        this.gateway.addListener(new CallBack<BankQuoteRequest>() {
+            public void call(BankQuoteRequest val) {
+                onBankQuoteRequest(val);
             }
         });
-
-        // create the serializer
-        serializer = new BankSerializer();
 
         // create GUI
         frame = new BankFrame(this, name);
@@ -89,7 +52,7 @@ public class Bank {
             }
         });
     }
-
+    
     public boolean onSendBankReplyClicked(BankQuoteRequest request, double interest, int error)
     {
          BankQuoteReply reply = createReply(interest,error);
@@ -106,18 +69,11 @@ public class Bank {
      * randomly generates a reply and sends it back.
      * @param message
      */
-    private void onBankQuoteRequest(TextMessage message) {
-        try {
-            BankQuoteRequest request = serializer.requestFromString(message.getText());
-            frame.addRequest(request);
-            if (JMSSettings.getRunMode() == RunMode.AUTOMATICALLY) { // only in automatic mode send immediately random reply
-
-                BankQuoteReply reply = computeReplyRandomly(request);
-                Bank.this.sendReply(request, reply);
-
-            }
-        } catch (Exception ex) {
-            Logger.getLogger(Bank.class.getName()).log(Level.SEVERE, null, ex);
+    private void onBankQuoteRequest(BankQuoteRequest request) {
+        frame.addRequest(request);
+        if (JMSSettings.getRunMode() == RunMode.AUTOMATICALLY) { // only in automatic mode send immediately random reply
+            BankQuoteReply reply = computeReplyRandomly(request);
+            Bank.this.sendReply(request, reply);
         }
     }
 
@@ -128,15 +84,9 @@ public class Bank {
      * @return true if the reply is successfully sent, false if sending fails
      */
     private boolean sendReply(BankQuoteRequest request, BankQuoteReply reply) {
-        try {
-            Message replyMessage = session.createTextMessage(serializer.replyToString(reply));
-            producer.send(replyMessage);
-            frame.addReply(request, reply);
-            return true;
-        } catch (JMSException ex) {
-            Logger.getLogger(Bank.class.getName()).log(Level.SEVERE, null, ex);
-            return false;
-        }
+        this.gateway.sendReply(reply);
+        frame.addReply(request, reply);
+        return true;
     }
 
     /**
@@ -176,10 +126,6 @@ public class Bank {
      * Opens connection to JMS,so that messages can be send and received.
      */
     public void start() {
-        try {
-            connection.start();
-        } catch (JMSException ex) {
-            Logger.getLogger(Bank.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        this.gateway.start();
     }
 }
