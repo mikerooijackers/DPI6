@@ -6,25 +6,12 @@ package loanbroker;
 
 import bank.BankQuoteReply;
 import bank.BankQuoteRequest;
-import bank.BankSerializer;
-import client.*;
+import client.ClientReply;
+import client.ClientRequest;
 import creditbureau.CreditReply;
 import creditbureau.CreditRequest;
-import creditbureau.CreditSerializer;
-import java.util.Properties;
-import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
-import javax.jms.MessageProducer;
-import javax.jms.Session;
-import javax.jms.TextMessage;
-import javax.naming.Context;
-import javax.naming.InitialContext;
 import loanbroker.gui.LoanBrokerFrame;
+import messaging.MessagingGateway.CallBack;
 
 /**
  *
@@ -32,31 +19,9 @@ import loanbroker.gui.LoanBrokerFrame;
  */
 public class LoanBroker {
 
-    /**
-     *  Connection to the JMS
-     */
-    private final Connection connection; // JMS connection
-    protected Session session; // JMS session
-      /*
-     * Connection to the TestClient
-     */
-    private final MessageProducer clientProducer; // for sending messages to the Client
-    private final MessageConsumer clientConsumer; // for receiving messages from the Client
-    private final ClientSerializer clientSerializer; // serializer ClientRequest ClientReply to/from XML:
-    /*
-     * Connection to the CreditBuerau
-     */
-    private final MessageProducer creditProducer; // for sending messages to the CreditBuerau
-    private final MessageConsumer creditConsumer; // for receiving messages from the CreditBuerau
-    private final CreditSerializer creditSerializer; // serializer CreditRequest CreditReply to/from XML:
-
-    /*
-     * Connection to the Bank
-     */
-    private final MessageProducer bankProducer; // for sending messages to the Bank
-    private final MessageConsumer bankConsumer; // for receiving messages from the Bank
-    private final BankSerializer bankSerializer; // serializer BankQuoteRequest BankQuoteReply to/from XML:
-
+    private final ClientGateway clientGateway;
+    private final CreditGateway creditGateway;
+    private final BankGateway bankIngGateway;
 
     private LoanBrokerFrame frame; // GUI
 
@@ -73,65 +38,29 @@ public class LoanBroker {
      */
     public LoanBroker(String clientRequestQueue, String clientReplyQueue, String creditRequestQueue, String creditReplyQueue, String bankRequestQueue, String bankReplyQueue) throws Exception {
         super();
-        // connecting to the JMS 
-        Properties props = new Properties();
-        props.setProperty(Context.INITIAL_CONTEXT_FACTORY,"org.apache.activemq.jndi.ActiveMQInitialContextFactory");
-        props.setProperty(Context.PROVIDER_URL,"tcp://localhost:61616");
-        props.put( ("queue." + clientRequestQueue ) ,clientRequestQueue);
-        props.put( ("queue." + clientReplyQueue ) ,clientReplyQueue);        
-        props.put( ("queue." + creditRequestQueue ) ,creditRequestQueue);        
-        props.put( ("queue." + creditReplyQueue ) ,creditReplyQueue);        
-        props.put( ("queue." + bankRequestQueue ) ,bankRequestQueue);        
-        props.put( ("queue." + bankReplyQueue ) , bankReplyQueue);                
-        Context jndiContext = new InitialContext(props);
-        ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
-        connection = connectionFactory.createConnection();
-        session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-        /*
-         * setting up the LoanTestClient connection
-         */
-        Destination clientSenderDestination = (Destination) jndiContext.lookup(clientReplyQueue);
-        clientProducer = session.createProducer(clientSenderDestination);
-        Destination clientReceiverDestination = (Destination) jndiContext.lookup(clientRequestQueue);
-        clientConsumer = session.createConsumer(clientReceiverDestination);
-        clientConsumer.setMessageListener(new MessageListener() {
+        
+        this.clientGateway = new ClientGateway(clientReplyQueue, clientRequestQueue);
+        this.creditGateway = new CreditGateway(creditReplyQueue, creditRequestQueue);
+        this.bankIngGateway = new BankGateway(bankReplyQueue, bankRequestQueue);
 
-            public void onMessage(Message msg) {
-                onClientRequest((TextMessage) msg);
+        this.clientGateway.addListener(new CallBack<ClientRequest>(){
+            public void call(ClientRequest val) {
+                onClientRequest(val);
             }
         });
-        clientSerializer = new ClientSerializer();
 
-        /*
-         * setting up the CreditBureau connection
-         */
-        Destination creditSenderDestination = (Destination) jndiContext.lookup(creditRequestQueue);
-        creditProducer = session.createProducer(creditSenderDestination);
-        Destination creditReceiverDestination = (Destination) jndiContext.lookup(creditReplyQueue);
-        creditConsumer = session.createConsumer(creditReceiverDestination);
-        creditConsumer.setMessageListener(new MessageListener() {
-
-            public void onMessage(Message msg) {
-                onCreditReply((TextMessage) msg);
+        this.creditGateway.addListener(new CallBack<CreditReply>(){
+            public void call(CreditReply val) {
+                onCreditReply(val);
             }
         });
-        creditSerializer = new CreditSerializer();
 
-
-        /*
-         * setting up the Bank connection
-         */
-        Destination bankSenderDestination = (Destination) jndiContext.lookup(bankRequestQueue);
-        bankProducer = session.createProducer(bankSenderDestination);
-        Destination bankReceiverDestination = (Destination) jndiContext.lookup(bankReplyQueue);
-        bankConsumer = session.createConsumer(bankReceiverDestination);
-        bankConsumer.setMessageListener(new MessageListener() {
-
-            public void onMessage(Message msg) {
-                onBankReply((TextMessage) msg);
+        this.bankIngGateway.addListener(new CallBack<BankQuoteReply>(){
+            public void call(BankQuoteReply val) {
+                onBankReply(val);
             }
         });
-        bankSerializer = new BankSerializer();
+        
         /*
          * Make the GUI
          */
@@ -150,16 +79,10 @@ public class LoanBroker {
      * It generates a CreditRequest and sends it to the CreditBureau.
      * @param message the incomming message containng the ClientRequest
      */
-    private void onClientRequest(TextMessage message) {
-        try {
-            ClientRequest request = clientSerializer.requestFromString(message.getText()); // de-serialize ClientRequest from the message
-            frame.addObject(null, request); // add the request to the GUI
-            CreditRequest credit = createCreditRequest(request); // generate CreditRequest
-            TextMessage creditRequestMesage = session.createTextMessage(creditSerializer.requestToString(credit)); // serialize CreditRequest into a message
-            creditProducer.send(creditRequestMesage); // send the credit request message to the CreditBureau
-        } catch (JMSException ex) {
-            ex.printStackTrace();
-        }
+    private void onClientRequest(ClientRequest request) {
+        frame.addObject(null, request);
+        CreditRequest credit = createCreditRequest(request);
+        this.creditGateway.sendRequest(credit);
     }
     
     /**
@@ -167,16 +90,10 @@ public class LoanBroker {
      * It generates a BankQuoteRequest and sends it to the Bank.
      * @param message the incomming message containng the CreditReply
      */
-    private void onCreditReply(TextMessage msg) {
-        try {
-            CreditReply reply = creditSerializer.replyFromString(msg.getText()); // de-serialize CreditReply from the message
-            frame.addObject(null, reply); // add the reply to the GUI
-            BankQuoteRequest bank = createBankRequest(null, reply); // generate BankQuoteRequest
-            TextMessage bankRequestMessage = session.createTextMessage(bankSerializer.requestToString(bank)); // serialize BankQuoteRequest into a message
-            bankProducer.send(bankRequestMessage); // send the bank quote request message to the Bank
-        } catch (JMSException ex) {
-            ex.printStackTrace();
-        }
+    private void onCreditReply(CreditReply reply) {
+        frame.addObject(null, reply); // add the reply to the GUI
+        BankQuoteRequest bank = createBankRequest(null, reply); // generate BankQuoteRequest
+        this.bankIngGateway.sendRequest(bank);
     }
     
     /**
@@ -184,16 +101,10 @@ public class LoanBroker {
      * It generates a ClientReply and sends it to the LoanTestClient.
      * @param message the incomming message containng the BankQuoteReply
      */
-    private void onBankReply(TextMessage msg) {
-        try {
-            BankQuoteReply reply = bankSerializer.replyFromString(msg.getText()); // de-serialize CreditReply from the message
-            frame.addObject(null, reply); // add the reply to the GUI
-            ClientReply client = createClientReply(reply); // generate ClientReply
-            TextMessage clientReplyMessage = session.createTextMessage(clientSerializer.replyToString(client)); // serialize ClientReply into a message
-            clientProducer.send(clientReplyMessage);  // send the client reply message to the LoanTestClient
-        } catch (JMSException ex) {
-            ex.printStackTrace();
-        }
+    private void onBankReply(BankQuoteReply reply) {
+        frame.addObject(null, reply); // add the reply to the GUI
+        ClientReply client = createClientReply(reply); // generate ClientReply
+        this.clientGateway.sendReply(client);
     }
     /**
      * Generates a credit request based on the given client request.
@@ -233,10 +144,8 @@ public class LoanBroker {
      * Opens connection to JMS,so that messages can be send and received.
      */
     public void start() {
-        try {
-            connection.start();
-        } catch (JMSException ex) {
-            ex.printStackTrace();
-        }
+        this.clientGateway.start();
+        this.creditGateway.start();
+        this.bankIngGateway.start();
     }
 }
