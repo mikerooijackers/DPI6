@@ -34,7 +34,7 @@ public class Bank {
         super();
         this.name = bankName;
         
-        this.gateway = new LoanBrokerGateway(bankReplyQueue, bankRequestQueue) {};
+        this.gateway = new LoanBrokerGateway(bankReplyQueue, bankRequestQueue);
 
         this.gateway.addListener(new CallBack<BankQuoteRequest>() {
             public void call(BankQuoteRequest val) {
