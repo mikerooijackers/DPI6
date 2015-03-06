@@ -29,7 +29,7 @@ public class BankGateway {
     
     private ArrayList<CallBack<BankQuoteReply>> callbacks;
 
-    public BankGateway(String requestQueue, String replyQueue) {
+    public BankGateway(String replyQueue,String requestQueue) {
         this.gateway = new MessagingGateway(replyQueue, requestQueue);
         this.serializer = new BankSerializer();
 

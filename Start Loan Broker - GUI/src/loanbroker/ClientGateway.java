@@ -29,7 +29,7 @@ public class ClientGateway {
     
     private ArrayList<CallBack<ClientRequest>> callbacks;
 
-    public ClientGateway(String requestQueue, String replyQueue) {
+    public ClientGateway(String replyQueue, String requestQueue) {
         this.gateway = new MessagingGateway(replyQueue, requestQueue);
         this.serializer = new ClientSerializer();
 

@@ -29,7 +29,7 @@ public class CreditGateway {
     
     private ArrayList<CallBack<CreditReply>> callbacks;
 
-    public CreditGateway(String requestQueue, String replyQueue) {
+    public CreditGateway(String replyQueue, String requestQueue) {
         this.gateway = new MessagingGateway(replyQueue, requestQueue);
         this.serializer = new CreditSerializer();
 
