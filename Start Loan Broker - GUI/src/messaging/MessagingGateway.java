@@ -34,7 +34,7 @@ public class MessagingGateway {
     private MessageProducer producer;
     
     
-    public MessagingGateway(String consumerDest, String producerDest) {
+    public MessagingGateway(String producerDest, String consumerDest) {
         try {
             
             Properties props = new Properties();
