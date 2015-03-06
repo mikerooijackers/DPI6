@@ -40,7 +40,7 @@ public class LoanBroker {
         super();
         
         this.clientGateway = new ClientGateway(clientReplyQueue, clientRequestQueue);
-        this.creditGateway = new CreditGateway(creditReplyQueue, creditRequestQueue);
+        this.creditGateway = new CreditGateway(creditRequestQueue,creditReplyQueue);
         this.bankIngGateway = new BankGateway(bankReplyQueue, bankRequestQueue);
 
         this.clientGateway.addListener(new CallBack<ClientRequest>(){

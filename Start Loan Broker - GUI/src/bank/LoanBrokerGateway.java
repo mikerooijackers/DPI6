@@ -26,7 +26,7 @@ public class LoanBrokerGateway {
     
     private ArrayList<CallBack<BankQuoteRequest>> callbacks;
 
-    public LoanBrokerGateway(String requestQueue, String replyQueue) {
+    public LoanBrokerGateway(String replyQueue,String requestQueue) {
         this.gateway = new MessagingGateway(requestQueue, replyQueue);
         this.serializer = new BankSerializer();
 
