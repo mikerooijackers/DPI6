@@ -44,6 +44,7 @@ public class AsynchronousReplier<REQUEST, REPLY> {
      * @param requestReceiverQueue is the name of teh JMS queue from which the requests
      *        will be received.
      * @param serializer  used to de-serialize REQUESTs and serialize REPLIES.
+     * @throws java.lang.Exception
      */
     public AsynchronousReplier(String requestReceiverQueue, IRequestReplySerializer<REQUEST, REPLY> serializer) throws Exception {
         super();
@@ -93,6 +94,7 @@ public class AsynchronousReplier<REQUEST, REPLY> {
 
     /**
      * Sends the reply for a specific request.
+     * @throws javax.jms.JMSException
      * @todo implement the following:
      * 1. get the requestMessage registered for the request from activeRequests
      * 2. serialize the reply and create the replyMessage for it
@@ -104,7 +106,7 @@ public class AsynchronousReplier<REQUEST, REPLY> {
      * @param reply to the request
      * @return  true if the reply is sent succefully; false if sending reply fails
      */
-    public synchronized boolean sendReply(REQUEST request, REPLY reply) {
+    public synchronized boolean sendReply(REQUEST request, REPLY reply) throws JMSException {
         Message requestMsg = activeRequests.get(request);
         String tempReplyMsg = serializer.replyToString(reply);
         Message replyMsg = gateway.createMsg(tempReplyMsg);
@@ -112,7 +114,5 @@ public class AsynchronousReplier<REQUEST, REPLY> {
         Destination dest = requestMsg.getJMSReplyTo();// retourn address
         gateway.send(dest, replyMsg);
         return true;
-        //Message msg = this.gateway.createMsg(this.serializer.replyToString(reply));
-        
     }
 }

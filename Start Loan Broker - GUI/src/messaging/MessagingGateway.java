@@ -74,9 +74,10 @@ public class MessagingGateway {
         }
     }
     
-    public void send(Message msg) {
+    public void send(Destination destination, Message msg) {
         try {
-            this.producer.send(msg);
+            
+            this.producer.send(destination, msg);
         } catch (JMSException ex) {
             Logger.getLogger(MessagingGateway.class.getName())
                     .log(Level.SEVERE, null, ex);
@@ -122,6 +123,14 @@ public class MessagingGateway {
     
     private void setProducer(String replyQueue) throws JMSException {
         this.producer = this.session.createProducer(this.destinations.get(replyQueue));
+    }
+
+    public void setReceivedMessageListener(MessageListener messageListener) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    public void openConnection() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
     
     public interface CallBack<TArg> {
