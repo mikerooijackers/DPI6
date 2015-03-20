@@ -3,6 +3,9 @@ package messaging.requestreply;
 import javax.jms.Message;
 import javax.jms.TextMessage;
 import java.util.Hashtable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.jms.JMSException;
 import javax.jms.MessageListener;
 import messaging.MessagingGateway;
 
@@ -61,7 +64,11 @@ public class AsynchronousRequestor<REQUEST, REPLY> {
         gateway.setReceivedMessageListener(new MessageListener() {
 
             public void onMessage(Message message) {
-                onReply((TextMessage) message);
+                try {
+                    onReply((TextMessage) message);
+                } catch (JMSException ex) {
+                    Logger.getLogger(AsynchronousRequestor.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         });
     }
@@ -87,8 +94,11 @@ public class AsynchronousRequestor<REQUEST, REPLY> {
      * @param request is the request object (a domain class) to be sent
      * @param listener is the listener that will be notified when the reply arrives for this request
      */
-    public synchronized void sendRequest(REQUEST request, IReplyListener<REQUEST, REPLY> listener) {
-       ...
+    public synchronized void sendRequest(REQUEST request, IReplyListener<REQUEST, REPLY> listener) throws JMSException {
+        Message message = gateway.createMsg(this.serializer.requestToString(request));
+        message.setJMSReplyTo(message.getJMSDestination());
+        gateway.send(message);
+        listeners.put(message.getJMSMessageID(), new Pair(listener, request));
     }
 
     /**
@@ -102,7 +112,10 @@ public class AsynchronousRequestor<REQUEST, REPLY> {
      * 4. unregister the listener
      * @param message the reply message
      */
-    private synchronized void onReply(TextMessage message) {
-       ...
+    private synchronized void onReply(TextMessage message) throws JMSException {
+       Pair pair = listeners.get(message.getJMSCorrelationID());
+       REPLY reply = this.serializer.replyFromString(message.getText());
+       pair.listener.onReply(pair.request, reply);
+       listeners.remove(reply);
     }
 }

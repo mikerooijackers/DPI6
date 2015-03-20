@@ -74,6 +74,16 @@ public class MessagingGateway {
         }
     }
     
+    public void send(Message msg) {
+        try {
+            
+            this.producer.send(msg);
+        } catch (JMSException ex) {
+            Logger.getLogger(MessagingGateway.class.getName())
+                    .log(Level.SEVERE, null, ex);
+        }
+    }
+    
     public void send(Destination destination, Message msg) {
         try {
             

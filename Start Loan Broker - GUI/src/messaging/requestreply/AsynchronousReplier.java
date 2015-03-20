@@ -107,9 +107,8 @@ public class AsynchronousReplier<REQUEST, REPLY> {
      * @return  true if the reply is sent succefully; false if sending reply fails
      */
     public synchronized boolean sendReply(REQUEST request, REPLY reply) throws JMSException {
-        Message requestMsg = activeRequests.get(request);
-        String tempReplyMsg = serializer.replyToString(reply);
-        Message replyMsg = gateway.createMsg(tempReplyMsg);
+        Message requestMsg = this.activeRequests.get(request);
+        Message replyMsg = gateway.createMsg(this.serializer.replyToString(reply));
         replyMsg.setJMSCorrelationID(requestMsg.getJMSMessageID()); // corrid
         Destination dest = requestMsg.getJMSReplyTo();// retourn address
         gateway.send(dest, replyMsg);
