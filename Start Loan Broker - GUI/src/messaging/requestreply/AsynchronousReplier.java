@@ -3,7 +3,10 @@ package messaging.requestreply;
 import javax.jms.Message;
 import javax.jms.TextMessage;
 import java.util.Hashtable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.jms.Destination;
+import javax.jms.JMSException;
 import javax.jms.MessageListener;
 import messaging.MessagingGateway;
 
@@ -79,7 +82,13 @@ public class AsynchronousReplier<REQUEST, REPLY> {
      * @param message the incomming message containing the request
      */
     private synchronized void onRequest(TextMessage message) {
-             ...
+        try {
+            REQUEST request = this.serializer.requestFromString(message.getText());
+            this.activeRequests.put(request, message);
+            requestListener.receivedRequest(request);
+        } catch (JMSException ex) {
+            Logger.getLogger(AsynchronousReplier.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -96,6 +105,14 @@ public class AsynchronousReplier<REQUEST, REPLY> {
      * @return  true if the reply is sent succefully; false if sending reply fails
      */
     public synchronized boolean sendReply(REQUEST request, REPLY reply) {
-        ...
+        Message requestMsg = activeRequests.get(request);
+        String tempReplyMsg = serializer.replyToString(reply);
+        Message replyMsg = gateway.createMsg(tempReplyMsg);
+        replyMsg.setJMSCorrelationID(requestMsg.getJMSMessageID()); // corrid
+        Destination dest = requestMsg.getJMSReplyTo();// retourn address
+        gateway.send(dest, replyMsg);
+        return true;
+        //Message msg = this.gateway.createMsg(this.serializer.replyToString(reply));
+        
     }
 }
