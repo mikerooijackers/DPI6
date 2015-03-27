@@ -4,6 +4,7 @@ import bank.BankQuoteReply;
 import client.*;
 import creditbureau.CreditReply;
 import java.util.ArrayList;
+import javax.jms.JMSException;
 import loanbroker.gui.LoanBrokerFrame;
 
 /**
@@ -29,6 +30,7 @@ public class LoanBroker {
      * @param creditReplyQueue
      * @param bankRequestQueue
      * @param bankReplyQueue
+     * @throws java.lang.Exception
      */
     public LoanBroker(String clientRequestQueue, String creditRequestQueue, String creditReplyQueue, String bankRequestQueue, String bankReplyQueue) throws Exception{
         super();
@@ -37,7 +39,8 @@ public class LoanBroker {
         clientGateway = new ClientGateway(clientRequestQueue) {
 
             @Override
-            void receivedLoanRequest(ClientRequest request) {
+            public void onClientRequestReceived(ClientRequest request)
+            {
                 onClientRequest(request);
             }
         };
@@ -85,8 +88,9 @@ public class LoanBroker {
 
     /**
      * starts all gateways
+     * @throws javax.jms.JMSException
      */
-    public void start() {
+    public void start() throws JMSException {
         clientGateway.start();
         creditGateway.start();
         bankGateway.start();

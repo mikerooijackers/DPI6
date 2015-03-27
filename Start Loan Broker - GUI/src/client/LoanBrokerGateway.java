@@ -5,62 +5,18 @@
  */
 package client;
 
-import java.util.ArrayList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageListener;
-import javax.jms.TextMessage;
-import messaging.MessagingGateway;
-import messaging.MessagingGateway.CallBack;
+import messaging.requestreply.AsynchronousRequestor;
 
 /**
  *
  * @author mikerooijackers
  */
-public class LoanBrokerGateway {
-    
-    private final MessagingGateway gateway;
-    private final ClientSerializer serializer;
-    
-    private ArrayList<CallBack<ClientReply>> callbacks;
+public class LoanBrokerGateway extends AsynchronousRequestor<ClientRequest, ClientReply>
+{
 
-    public LoanBrokerGateway(String requestQueue, String replyQueue) {
-        this.gateway = new MessagingGateway(requestQueue, replyQueue);
-        this.serializer = new ClientSerializer();
-        
-        this.callbacks = new ArrayList<CallBack<ClientReply>>();
-        this.gateway.setListener(new MessageListener() {
-            public void onMessage(Message msg) {
-                try {
-                    ClientReply req = 
-                            serializer.replyFromString(
-                                    ((TextMessage) msg)
-                                            .getText());
-                    for (CallBack<ClientReply> callback : callbacks) {
-                        callback.call(req);
-                    }
-                } catch (JMSException ex) {
-                    Logger.getLogger(LoanBrokerGateway.class.getName())
-                            .log(Level.SEVERE, null, ex);
-                }
-            }
-        });
+    public LoanBrokerGateway(String requestQueue, String replyQueue)
+            throws Exception
+    {
+        super(requestQueue, replyQueue, new ClientSerializer());
     }
-    
-    public void addListener(CallBack<ClientReply> listener) {
-        this.callbacks.add(listener);
-    }
-    
-    public void sendRequest(ClientRequest request) {
-        Message msg = this.gateway.createMsg(
-                this.serializer.requestToString(request));
-        this.gateway.send(msg);
-    }
-    
-    public void start() {
-        this.gateway.start();
-    }
-    
 }

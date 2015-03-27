@@ -2,7 +2,9 @@ package creditbureau;
 
 import creditbureau.gui.CreditFrame;
 import java.util.Random;
-import messaging.MessagingGateway.CallBack;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.jms.JMSException;
 
 /**
  * This class represents one Credit Agency Application.
@@ -18,37 +20,42 @@ public class CreditBureau {
     
     private final LoanBrokerGateway gateway;
     
-    public CreditBureau(String creditRequestQueue, String creditReplyQueue) throws Exception {
-        super();
+    public CreditBureau(String creditRequestQueue) 
+            throws Exception
+    {
+        gateway = new LoanBrokerGateway(creditRequestQueue)
+        {
 
-        this.gateway = new LoanBrokerGateway(creditRequestQueue, creditReplyQueue);
-
-        this.gateway.addListener(new CallBack<CreditRequest>() {
-            public void call(CreditRequest val) {
-                onCreditRequest(val);
+            @Override
+            public void onCreditRequestReceived(CreditRequest request)
+            {
+                try
+                {
+                    frame.addRequest(request);
+                    CreditReply reply = computeReply(request);
+                    frame.addReply(request, reply);
+                    gateway.sendReply(request, reply);
+                }
+                catch (Exception ex)
+                {
+                    Logger.getLogger(CreditBureau.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
-        });
+        };
 
         // create GUI
         frame = new CreditFrame();
-        java.awt.EventQueue.invokeLater(new Runnable() {
+        java.awt.EventQueue.invokeLater(new Runnable()
+        {
 
-            public void run() {
-
+            @Override
+            public void run()
+            {
                 frame.setVisible(true);
             }
         });
     }
-/**
-     * Processes a new request message by randomly generating a reply and sending it back.
-     * @param message the credit request message
-     */
-    private void onCreditRequest(CreditRequest request) {
-        frame.addRequest(request);
-        CreditReply reply = computeReply(request);
-        this.gateway.sendReply(reply);
-        frame.addReply(request, reply);
-    }
+
    /**
     * Randomly generates a CreditReply given the request.
     * @param request is the CreditRequest for which the reply must be generated
@@ -65,7 +72,7 @@ public class CreditBureau {
     /**
      * Opens connection to JMS,so that messages can be send and received.
      */
-    public void start() {
+    public void start() throws JMSException {
         this.gateway.start();
     }
 }

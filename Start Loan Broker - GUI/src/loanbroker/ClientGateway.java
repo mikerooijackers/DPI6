@@ -8,62 +8,31 @@ package loanbroker;
 import client.ClientReply;
 import client.ClientRequest;
 import client.ClientSerializer;
-import java.util.ArrayList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageListener;
-import javax.jms.TextMessage;
-import messaging.MessagingGateway;
-import messaging.MessagingGateway.CallBack;
+import messaging.requestreply.AsynchronousReplier;
+import messaging.requestreply.IRequestListener;
 
 /**
  *
  * @author mikerooijackers
  */
-public class ClientGateway {
+public abstract class ClientGateway extends AsynchronousReplier<ClientRequest, ClientReply>
+{
     
-    private final MessagingGateway gateway;
-    private ClientSerializer serializer;
-    
-    private ArrayList<CallBack<ClientRequest>> callbacks;
-
-    public ClientGateway(String replyQueue, String requestQueue) {
-        this.gateway = new MessagingGateway(replyQueue, requestQueue);
-        this.serializer = new ClientSerializer();
-
-        this.callbacks = new ArrayList<CallBack<ClientRequest>>();
-
-        this.gateway.setListener(new MessageListener() {
-            public void onMessage(Message msg) {
-                try {
-                    ClientRequest req = 
-                            serializer.requestFromString(
-                                    ((TextMessage) msg)
-                                            .getText());
-                    for (CallBack<ClientRequest> callback : callbacks) {
-                        callback.call(req);
-                    }
-                } catch (JMSException ex) {
-                    Logger.getLogger(ClientGateway.class.getName())
-                            .log(Level.SEVERE, null, ex);
-                }
+    public ClientGateway(String requestQueue)
+            throws Exception
+    {
+        super(requestQueue, new ClientSerializer());
+        super.setRequestListener(new IRequestListener<ClientRequest>()
+        {
+            
+            @Override
+            public void receivedRequest(ClientRequest request)
+            {
+                onClientRequestReceived(request);
             }
         });
     }
     
-    public void addListener(CallBack<ClientRequest> listener) {
-        this.callbacks.add(listener);
-    }
-    
-    public void sendReply(ClientReply reply) {
-        Message msg = this.gateway.createMsg(
-                this.serializer.replyToString(reply));
-        this.gateway.send(msg);
-    }
-    
-    public void start() {
-        this.gateway.start();
-    }
+    public abstract void onClientRequestReceived(ClientRequest request);
 }
+

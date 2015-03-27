@@ -26,124 +26,91 @@ import javax.naming.NamingException;
  *
  * @author mikerooijackers
  */
-public class MessagingGateway {
-    private Connection connection;
+public class MessagingGateway
+{
+
+    private final String ACTIVEMQ_CONTEXTFACTORY = "org.apache.activemq.jndi.ActiveMQInitialContextFactory";
+    private final String PROVIDER_URL = "tcp://localhost:61616";
+
     private Session session;
-    private HashMap<String, Destination> destinations;
+    private Connection connection;
+
+    private Destination consumerDestination;
+    private Destination producerDestination;
+
     private MessageConsumer consumer;
     private MessageProducer producer;
-    
-    
-    public MessagingGateway(String producerDest, String consumerDest) {
-        try {
-            
-            Properties props = new Properties();
-            props.setProperty(Context.INITIAL_CONTEXT_FACTORY,"org.apache.activemq.jndi.ActiveMQInitialContextFactory");
-            props.setProperty(Context.PROVIDER_URL,"tcp://localhost:61616");
-            props.put( ( "queue." + consumerDest ) ,consumerDest);
-            props.put( ( "queue." + producerDest ) ,producerDest);        
-            Context jndiContext = new InitialContext(props);
-            
-            ConnectionFactory connectionFactory = 
-                    (ConnectionFactory) jndiContext.lookup(
-                            "ConnectionFactory");
-            
-            this.connection = connectionFactory.createConnection();
-            this.session = this.connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
-            this.setDestinations(consumerDest, producerDest, jndiContext);
-            this.setConsumer(consumerDest);
-            this.setProducer(producerDest);
-            
-        } catch (NamingException ex) {
-            Logger.getLogger(MessagingGateway.class.getName())
-                    .log(Level.SEVERE, null, ex);
-        } catch (JMSException ex) {
-            Logger.getLogger(MessagingGateway.class.getName())
-                    .log(Level.SEVERE, null, ex);
+    public MessagingGateway(String producerQueue, String consumerQueue)
+            throws NamingException, JMSException
+    {
+        Properties props = createProperties();
+        if (consumerQueue != null && !consumerQueue.equals(""))
+        {
+            props.put("queue." + consumerQueue, consumerQueue);
         }
-    }
-    
-    public Message createMsg(String body) {
-        try {
-            return this.session.createTextMessage(body);
-        } catch (JMSException ex) {
-            Logger.getLogger(MessagingGateway.class.getName())
-                    .log(Level.SEVERE, null, ex);
-            return null;
+
+        if (producerQueue != null && !producerQueue.equals(""))
+        {
+            props.put("queue." + producerQueue, producerQueue);
         }
-    }
-    
-    public void send(Message msg) {
-        try {
-            
-            this.producer.send(msg);
-        } catch (JMSException ex) {
-            Logger.getLogger(MessagingGateway.class.getName())
-                    .log(Level.SEVERE, null, ex);
+
+        Context jdniContext = new InitialContext(props);
+        ConnectionFactory connectionFactory = (ConnectionFactory) jdniContext.lookup("ConnectionFactory");
+        connection = connectionFactory.createConnection();
+        session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+        consumerDestination = (Destination) jdniContext.lookup(consumerQueue);
+        consumer = session.createConsumer(consumerDestination);
+
+        if (producerQueue != null && !producerQueue.equals(""))
+        {
+            producerDestination = (Destination) jdniContext.lookup(producerQueue);
+            producer = session.createProducer(producerDestination);
         }
-    }
-    
-    public void send(Destination destination, Message msg) {
-        try {
-            
-            this.producer.send(destination, msg);
-        } catch (JMSException ex) {
-            Logger.getLogger(MessagingGateway.class.getName())
-                    .log(Level.SEVERE, null, ex);
-        }
-    }
-    
-    public void setListener(MessageListener listener) {
-        try {
-            this.consumer.setMessageListener(listener);
-        } catch (JMSException ex) {
-            Logger.getLogger(MessagingGateway.class.getName())
-                    .log(Level.SEVERE, null, ex);
-        }
-    }
-    
-    public void start() {
-        try {
-            this.connection.start();
-        } catch (JMSException ex) {
-            Logger.getLogger(MessagingGateway.class.getName())
-                    .log(Level.SEVERE, null, ex);
-        }
-    }
-    
-    private void setDestinations(String requestQueue, String replyQueue, Context jndiContext) 
-            throws NamingException {
-        this.destinations = new HashMap<String, Destination>();
-        this.destinations.put(
-                requestQueue,
-                (Destination)
-                        jndiContext.lookup(
-                                requestQueue));
-        this.destinations.put(
-                replyQueue,
-                (Destination)
-                        jndiContext.lookup(
-                                replyQueue));
-    }
-    
-    private void setConsumer(String requestQueue) throws JMSException {
-        this.consumer = this.session.createConsumer(this.destinations.get(requestQueue));
-    }
-    
-    private void setProducer(String replyQueue) throws JMSException {
-        this.producer = this.session.createProducer(this.destinations.get(replyQueue));
     }
 
-    public void setReceivedMessageListener(MessageListener messageListener) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public Destination getConsumerDestination()
+    {
+        return consumerDestination;
     }
 
-    public void openConnection() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public void setListener(MessageListener listener)
+            throws JMSException
+    {
+        consumer.setMessageListener(listener);
     }
-    
-    public interface CallBack<TArg> {
-        public abstract void call(TArg val);
+
+    public void start()
+            throws JMSException
+    {
+        connection.start();
+    }
+
+    public void sendMessage(Message message)
+            throws JMSException
+    {
+        producer.send(message);
+    }
+
+    public void sendMessage(Destination destination, Message message)
+            throws JMSException
+    {
+        MessageProducer tempProducer = session.createProducer(destination);
+        tempProducer.send(message);
+    }
+
+    public Message createMessage(String body)
+            throws JMSException
+    {
+        return session.createTextMessage(body);
+    }
+
+    private Properties createProperties()
+    {
+        Properties props = new Properties();
+        props.setProperty(Context.INITIAL_CONTEXT_FACTORY, ACTIVEMQ_CONTEXTFACTORY);
+        props.setProperty(Context.PROVIDER_URL, PROVIDER_URL);
+        return props;
     }
 }

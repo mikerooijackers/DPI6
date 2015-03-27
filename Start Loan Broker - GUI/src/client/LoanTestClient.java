@@ -1,7 +1,10 @@
 package client;
 
-import messaging.MessagingGateway.CallBack;
 import client.gui.ClientFrame;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.jms.JMSException;
+import messaging.requestreply.IReplyListener;
 
 /**
  * This class represents one Client Application.
@@ -24,14 +27,7 @@ public class LoanTestClient {
      */
     public LoanTestClient(String name, String requestQueue, String replyQueue) throws Exception {
         super();
-        
         this.gateway = new LoanBrokerGateway(requestQueue, replyQueue);
-        
-        this.gateway.addListener(new CallBack<ClientReply>() {
-            public void call(ClientReply val) {
-                processLoanOffer(val);
-            }
-        });
         
          // create the GUI
         frame = new ClientFrame(name) {
@@ -44,6 +40,7 @@ public class LoanTestClient {
 
         java.awt.EventQueue.invokeLater(new Runnable() {
 
+            @Override
             public void run() {
 
                 frame.setVisible(true);
@@ -56,21 +53,28 @@ public class LoanTestClient {
      * @param request
      */
     public void sendRequest(ClientRequest request) {
-        this.gateway.sendRequest(request);
-        this.frame.addRequest(request);
-    }
-    /**
-     * This message is called whenever a new client reply message arrives.
-     *  The message is de-serialized into a ClientReply, and the reply is shown in the GUI.
-     * @param message
-     */
-    private void processLoanOffer(ClientReply reply) {
-        frame.addReply(null, reply);
+        try
+        {
+            gateway.sendRequest(request, new IReplyListener<ClientRequest, ClientReply>()
+            {
+
+                @Override
+                public void onReply(ClientRequest request, ClientReply reply)
+                {
+                    frame.addReply(request, reply);
+                }
+            });
+            frame.addRequest(request);
+        }
+        catch (Exception ex)
+        {
+            Logger.getLogger(LoanTestClient.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
     /**
      * Opens connection to JMS,so that messages can be send and received.
      */
-    public void start() {
+    public void start() throws JMSException {
         this.gateway.start();
     }
 }

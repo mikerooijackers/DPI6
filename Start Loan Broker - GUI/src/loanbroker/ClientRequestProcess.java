@@ -6,6 +6,8 @@ import client.ClientReply;
 import client.ClientRequest;
 import creditbureau.CreditReply;
 import creditbureau.CreditRequest;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import messaging.requestreply.IReplyListener;
 
 /**
@@ -43,14 +45,16 @@ abstract class ClientRequestProcess {
         this.bankGateway = bankGateway;
         this.creditReplyListener = new IReplyListener<CreditRequest, CreditReply>() {
 
+            @Override
             public void onReply(CreditRequest request, CreditReply reply) {
                 onCreditReply(reply);
             }
         };
         this.bankReplyListener = new IReplyListener<BankQuoteRequest, BankQuoteReply>() {
 
+            @Override
             public void onReply(BankQuoteRequest request, BankQuoteReply reply) {
-                bankQuoteArrived(reply);
+                onBankQuoteReply(reply);
             }
         };
         requestCreditHistory();
@@ -67,7 +71,12 @@ abstract class ClientRequestProcess {
      * 2. send the creditRequest and register the method onCreditReply as the listener for the reply
      */
     private void requestCreditHistory() {
-      ...  [Enter code here] ...
+        try {
+            creditRequest = createCreditRequest(clientRequest);
+            creditGateway.sendRequest(creditRequest, creditReplyListener);
+        } catch (Exception ex) {
+            Logger.getLogger(ClientRequestProcess.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -78,7 +87,17 @@ abstract class ClientRequestProcess {
      * 3. send the bankRequest and register the method onBankQuoteReply as the listener for the reply
      */
     public void onCreditReply(CreditReply reply) {
-      ...  [Enter code here] ...
+        try
+        {
+            creditReply = reply;
+            notifyReceivedCreditReply(clientRequest, creditReply);
+            bankQuoteRequest = createBankRequest(clientRequest, creditReply);
+            bankGateway.sendRequest(bankQuoteRequest, bankReplyListener);
+        }
+        catch (Exception ex)
+        {
+            Logger.getLogger(ClientRequestProcess.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     abstract void notifyReceivedCreditReply(ClientRequest clientRequest, CreditReply reply);
@@ -92,7 +111,18 @@ abstract class ClientRequestProcess {
      * 4. call method notifySentClientReply to notify the LoanBroker that this process has finished
      */
     public void onBankQuoteReply(BankQuoteReply reply) {
-      ...  [Enter code here] ...
+        try
+        {
+            bankQuoteReply = reply;
+            notifyReceivedBankReply(clientRequest, bankQuoteReply);
+            clientReply = createClientReply(bankQuoteReply);
+            clientGateway.sendReply(clientRequest, clientReply);
+            notifySentClientReply(this);
+        }
+        catch (Exception ex)
+        {
+            Logger.getLogger(ClientRequestProcess.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
     abstract void notifyReceivedBankReply(ClientRequest clientRequest, BankQuoteReply reply);
 
