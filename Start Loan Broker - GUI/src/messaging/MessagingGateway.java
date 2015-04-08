@@ -5,10 +5,7 @@
  */
 package messaging;
 
-import java.util.HashMap;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.Destination;
@@ -23,14 +20,12 @@ import javax.naming.InitialContext;
 import javax.naming.NamingException;
 
 /**
+ * A gateway that handles JMS messaging.
  *
  * @author mikerooijackers
  */
 public class MessagingGateway
 {
-
-    private final String ACTIVEMQ_CONTEXTFACTORY = "org.apache.activemq.jndi.ActiveMQInitialContextFactory";
-    private final String PROVIDER_URL = "tcp://localhost:61616";
 
     private Session session;
     private Connection connection;
@@ -44,7 +39,7 @@ public class MessagingGateway
     public MessagingGateway(String producerQueue, String consumerQueue)
             throws NamingException, JMSException
     {
-        Properties props = createProperties();
+        Properties props = MessagingHelper.createProperties();
         if (consumerQueue != null && !consumerQueue.equals(""))
         {
             props.put("queue." + consumerQueue, consumerQueue);
@@ -104,13 +99,5 @@ public class MessagingGateway
             throws JMSException
     {
         return session.createTextMessage(body);
-    }
-
-    private Properties createProperties()
-    {
-        Properties props = new Properties();
-        props.setProperty(Context.INITIAL_CONTEXT_FACTORY, ACTIVEMQ_CONTEXTFACTORY);
-        props.setProperty(Context.PROVIDER_URL, PROVIDER_URL);
-        return props;
     }
 }

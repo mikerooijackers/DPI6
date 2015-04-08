@@ -8,13 +8,17 @@ import creditbureau.CreditReply;
 import creditbureau.CreditRequest;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import loanbroker.bank.BankGateway;
+import messaging.GatewayException;
 import messaging.requestreply.IReplyListener;
 
 /**
  * This class is responsible to processing a single ClientRequest.
+ *
  * @author Maja Pesic
  */
-abstract class ClientRequestProcess {
+abstract class ClientRequestProcess
+{
 
     private ClientRequest clientRequest = null;
     private CreditRequest creditRequest = null;
@@ -32,49 +36,60 @@ abstract class ClientRequestProcess {
 
     /**
      * initializes the clientRequest and 3 gateways, and send the CreditRequest
+     *
      * @param clientRequest
      * @param creditGateway
      * @param clientGateway
      * @param bankGatewayNew
      */
-    public ClientRequestProcess(ClientRequest clientRequest, CreditGateway creditGateway, ClientGateway clientGateway, BankGateway bankGateway) {
-        super();
+    public ClientRequestProcess(ClientRequest clientRequest, CreditGateway creditGateway, ClientGateway clientGateway, BankGateway bankGateway)
+    {
         this.clientRequest = clientRequest;
         this.creditGateway = creditGateway;
         this.clientGateway = clientGateway;
         this.bankGateway = bankGateway;
-        this.creditReplyListener = new IReplyListener<CreditRequest, CreditReply>() {
+        this.creditReplyListener = new IReplyListener<CreditRequest, CreditReply>()
+        {
 
             @Override
-            public void onReply(CreditRequest request, CreditReply reply) {
+            public void onReply(CreditRequest request, CreditReply reply)
+            {
                 onCreditReply(reply);
             }
         };
-        this.bankReplyListener = new IReplyListener<BankQuoteRequest, BankQuoteReply>() {
+        this.bankReplyListener = new IReplyListener<BankQuoteRequest, BankQuoteReply>()
+        {
 
             @Override
-            public void onReply(BankQuoteRequest request, BankQuoteReply reply) {
+            public void onReply(BankQuoteRequest request, BankQuoteReply reply)
+            {
                 onBankQuoteReply(reply);
             }
         };
         requestCreditHistory();
     }
 
-    public ClientRequest getClientRequest() {
+    public ClientRequest getClientRequest()
+    {
         return clientRequest;
     }
 
     /**
      * Sends the CreditRequest
-     * @todo Implement the following
-     * 1. create the creditRequest from the clientRequest (use method createCreditRequest)
-     * 2. send the creditRequest and register the method onCreditReply as the listener for the reply
+     *
+     * @todo Implement the following 1. create the creditRequest from the
+     * clientRequest (use method createCreditRequest) 2. send the creditRequest
+     * and register the method onCreditReply as the listener for the reply
      */
-    private void requestCreditHistory() {
-        try {
+    private void requestCreditHistory()
+    {
+        try
+        {
             creditRequest = createCreditRequest(clientRequest);
             creditGateway.sendRequest(creditRequest, creditReplyListener);
-        } catch (Exception ex) {
+        }
+        catch (GatewayException ex)
+        {
             Logger.getLogger(ClientRequestProcess.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
@@ -86,31 +101,26 @@ abstract class ClientRequestProcess {
      * 2. create the bankRequest from the creditRequest (use method createBankRequest)
      * 3. send the bankRequest and register the method onBankQuoteReply as the listener for the reply
      */
-    public void onCreditReply(CreditReply reply) {
-        try
-        {
-            creditReply = reply;
-            notifyReceivedCreditReply(clientRequest, creditReply);
-            bankQuoteRequest = createBankRequest(clientRequest, creditReply);
-            bankGateway.sendRequest(bankQuoteRequest, bankReplyListener);
-        }
-        catch (Exception ex)
-        {
-            Logger.getLogger(ClientRequestProcess.class.getName()).log(Level.SEVERE, null, ex);
-        }
+    public void onCreditReply(CreditReply reply)
+    {
+        creditReply = reply;
+        notifyReceivedCreditReply(clientRequest, creditReply);
+        bankQuoteRequest = createBankRequest(clientRequest, creditReply);
+        bankGateway.sendRequest(bankQuoteRequest, bankReplyListener);
     }
-
-    abstract void notifyReceivedCreditReply(ClientRequest clientRequest, CreditReply reply);
 
     /**
      * Receives the bankQuoteReply
-     * @todo Implement the following
-     * 1. call method notifyReceivedBankReply to add the BankQuoteReply to the GUI
-     * 2. create the clientReply from the bankQuoteReply (use method createClientReply)
-     * 3. send the clientReply and notify the LoanBroker that you have sent the clientReply
-     * 4. call method notifySentClientReply to notify the LoanBroker that this process has finished
+     *
+     * @todo Implement the following 1. call method notifyReceivedBankReply to
+     * add the BankQuoteReply to the GUI 2. create the clientReply from the
+     * bankQuoteReply (use method createClientReply) 3. send the clientReply and
+     * notify the LoanBroker that you have sent the clientReply 4. call method
+     * notifySentClientReply to notify the LoanBroker that this process has
+     * finished
      */
-    public void onBankQuoteReply(BankQuoteReply reply) {
+    public void onBankQuoteReply(BankQuoteReply reply)
+    {
         try
         {
             bankQuoteReply = reply;
@@ -119,45 +129,54 @@ abstract class ClientRequestProcess {
             clientGateway.sendReply(clientRequest, clientReply);
             notifySentClientReply(this);
         }
-        catch (Exception ex)
+        catch (GatewayException ex)
         {
             Logger.getLogger(ClientRequestProcess.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-    abstract void notifyReceivedBankReply(ClientRequest clientRequest, BankQuoteReply reply);
 
-    abstract void notifySentClientReply(ClientRequestProcess process);
+    public abstract void notifyReceivedCreditReply(ClientRequest clientRequest, CreditReply reply);
+    
+    public abstract void notifyReceivedBankReply(ClientRequest clientRequest, BankQuoteReply reply);
 
-  
+    public abstract void notifySentClientReply(ClientRequestProcess process);
+
     /**
      * Generates a credit request based on the given client request.
+     *
      * @param clientRequest
      * @return
      */
-    private CreditRequest createCreditRequest(ClientRequest clientRequest) {
+    private CreditRequest createCreditRequest(ClientRequest clientRequest)
+    {
         return new CreditRequest(clientRequest.getSSN());
     }
 
-     /**
-     * Generates a bank quote reguest based on the given client request and credit reply.
+    /**
+     * Generates a bank quote reguest based on the given client request and
+     * credit reply.
+     *
      * @param creditReply
      * @return
      */
-    private BankQuoteRequest createBankRequest(ClientRequest clientRequest, CreditReply creditReply) {
+    private BankQuoteRequest createBankRequest(ClientRequest clientRequest, CreditReply creditReply)
+    {
         int ssn = creditReply.getSSN();
         int score = creditReply.getCreditScore();
         int history = creditReply.getHistory();
         int amount = clientRequest.getAmount();
         int time = clientRequest.getTime();
-        return  new BankQuoteRequest(ssn, score, history, amount, time);
+        return new BankQuoteRequest(ssn, score, history, amount, time);
     }
 
-        /**
+    /**
      * Generates a client reply based on the given bank quote reply.
+     *
      * @param creditReply
      * @return
      */
-    private ClientReply createClientReply(BankQuoteReply reply) {
+    private ClientReply createClientReply(BankQuoteReply reply)
+    {
         return new ClientReply(reply.getInterest(), reply.getQuoteId());
     }
 

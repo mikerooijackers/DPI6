@@ -17,7 +17,8 @@ import messaging.requestreply.AsynchronousRequestor;
 public class CreditGateway extends AsynchronousRequestor<CreditRequest, CreditReply>
 {
     
-    public CreditGateway(String requestQueue, String replyQueue) throws Exception
+    public CreditGateway(String requestQueue, String replyQueue)
+            throws Exception
     {
         super(requestQueue, replyQueue, new CreditSerializer());
     }

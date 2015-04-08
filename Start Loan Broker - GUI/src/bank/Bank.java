@@ -4,16 +4,16 @@ import bank.gui.BankFrame;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.jms.JMSException;
 import main.JMSSettings;
 import main.JMSSettings.RunMode;
+import messaging.GatewayException;
 
 /**
- * This class represents one Bank Application.
- * It should eventually:
- *  1. Receive BankQuoteRequest-s for a loan from the LoanBroker Messaging-Oriented Middleware (MOM).
- *  2. Randomly create BankQuoteReply for each request (use method "computeBankReply").
- *  3. Send the BankQuoteReply from the LoanBroker MOM.
+ * This class represents one Bank Application. It should eventually: 1. Receive
+ * BankQuoteRequest-s for a loan from the LoanBroker Messaging-Oriented
+ * Middleware (MOM). 2. Randomly create BankQuoteReply for each request (use
+ * method "computeBankReply"). 3. Send the BankQuoteReply from the LoanBroker
+ * MOM.
  */
 public class Bank
 {
@@ -82,11 +82,14 @@ public class Bank
      */
     private boolean sendBankQuoteReply(BankQuoteRequest request, BankQuoteReply reply)
     {
-        try {
+        try
+        {
             frame.addReply(request, reply);
             gateway.sendReply(request, reply);
             return true;
-        } catch (JMSException ex) {
+        }
+        catch (GatewayException ex)
+        {
             Logger.getLogger(Bank.class.getName()).log(Level.SEVERE, null, ex);
             return false;
         }
@@ -133,9 +136,10 @@ public class Bank
     /**
      * Opens connection to JMS,so that messages can be send and received.
      *
-     * @throws java.lang.Exception
+     * @throws messaging.GatewayException
      */
-    public void start() throws Exception
+    public void start()
+            throws Exception
     {
         gateway.start();
     }

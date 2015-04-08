@@ -4,20 +4,21 @@ import bank.BankQuoteReply;
 import client.*;
 import creditbureau.CreditReply;
 import java.util.ArrayList;
-import javax.jms.JMSException;
+import loanbroker.bank.BankGateway;
 import loanbroker.gui.LoanBrokerFrame;
 
 /**
  *
  * @author Maja Pesic
  */
-public class LoanBroker {
+public class LoanBroker
+{
 
     private ClientGateway clientGateway;
     private CreditGateway creditGateway;
     private BankGateway bankGateway;
     /**
-     *  the collection of active clientRequests
+     * the collection of active clientRequests
      */
     private ArrayList<ClientRequestProcess> activeClientProcesses;
     private LoanBrokerFrame frame;
@@ -25,18 +26,20 @@ public class LoanBroker {
     /**
      * Intializes attributes, and registers itself (method onClientRequest) as
      * the listener for new client requests
+     *
      * @param clientRequestQueue
      * @param creditRequestQueue
      * @param creditReplyQueue
-     * @param bankRequestQueue
      * @param bankReplyQueue
      * @throws java.lang.Exception
      */
-    public LoanBroker(String clientRequestQueue, String creditRequestQueue, String creditReplyQueue, String bankRequestQueue, String bankReplyQueue) throws Exception{
-        super();
+    public LoanBroker(String clientRequestQueue, String creditRequestQueue, String creditReplyQueue, String bankReplyQueue) 
+            throws Exception
+    {
         frame = new LoanBrokerFrame();
         activeClientProcesses = new ArrayList<>();
-        clientGateway = new ClientGateway(clientRequestQueue) {
+        clientGateway = new ClientGateway(clientRequestQueue)
+        {
 
             @Override
             public void onClientRequestReceived(ClientRequest request)
@@ -46,51 +49,68 @@ public class LoanBroker {
         };
 
         creditGateway = new CreditGateway(creditRequestQueue, creditReplyQueue);
-        bankGateway = new BankGateway(bankRequestQueue,bankReplyQueue);
+        bankGateway = new BankGateway(null, bankReplyQueue);
 
-        java.awt.EventQueue.invokeLater(new Runnable() {
+        java.awt.EventQueue.invokeLater(new Runnable()
+        {
 
-            public void run() {
+            @Override
+            public void run()
+            {
 
                 frame.setVisible(true);
             }
         });
     }
+    
+    public void addBank(String destination, String expression)
+    {
+        bankGateway.addBank(null, destination, expression);
+    }
 
     /**
-     * When a new client reques arrives:
-     * 1. a new instance of ClientRequestProcess is created for this request,
-     * 2. method  notifyFinished is implemented to remove the process from activeClientProcesses
-     * 3. the new process is added to activeClientProcesses
+     * When a new client reques arrives: 1. a new instance of
+     * ClientRequestProcess is created for this request, 2. method
+     * notifyFinished is implemented to remove the process from
+     * activeClientProcesses 3. the new process is added to
+     * activeClientProcesses
+     *
      * @param message the incomming message containng the ClientRequest
      */
-    private void onClientRequest(ClientRequest request) {
-        final ClientRequestProcess p = new ClientRequestProcess(request, creditGateway, clientGateway, bankGateway) {
+    private void onClientRequest(ClientRequest request)
+    {
+        ClientRequestProcess p = new ClientRequestProcess(request, creditGateway, clientGateway, bankGateway)
+        {
 
             @Override
-            void notifySentClientReply(ClientRequestProcess process) {
+            public void notifySentClientReply(ClientRequestProcess process)
+            {
                 activeClientProcesses.remove(process);
             }
 
             @Override
-            void notifyReceivedCreditReply(ClientRequest clientRequest, CreditReply reply) {
-               frame.addObject(clientRequest, reply);
+            public void notifyReceivedCreditReply(ClientRequest clientRequest, CreditReply reply)
+            {
+                frame.addObject(clientRequest, reply);
             }
 
             @Override
-            void notifyReceivedBankReply(ClientRequest clientRequest, BankQuoteReply reply) {
+            public void notifyReceivedBankReply(ClientRequest clientRequest, BankQuoteReply reply)
+            {
                 frame.addObject(clientRequest, reply);
             }
-        };        
+        };
         activeClientProcesses.add(p);
-        frame.addObject(null,request);
+        frame.addObject(null, request);
     }
 
     /**
      * starts all gateways
-     * @throws javax.jms.JMSException
+     * @throws java.lang.Exception
      */
-    public void start() throws JMSException {
+    public void start()
+            throws Exception
+    {
         clientGateway.start();
         creditGateway.start();
         bankGateway.start();

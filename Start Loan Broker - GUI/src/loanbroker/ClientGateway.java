@@ -35,4 +35,3 @@ public abstract class ClientGateway extends AsynchronousReplier<ClientRequest, C
     
     public abstract void onClientRequestReceived(ClientRequest request);
 }
-

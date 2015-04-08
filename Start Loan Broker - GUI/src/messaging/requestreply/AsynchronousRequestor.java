@@ -1,13 +1,14 @@
 package messaging.requestreply;
 
 import java.util.HashMap;
-import javax.jms.Message;
-import javax.jms.TextMessage;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.TextMessage;
 import javax.jms.MessageListener;
+import messaging.GatewayException;
 import messaging.MessagingGateway;
 
 /**
@@ -19,18 +20,21 @@ import messaging.MessagingGateway;
  * @param <REPLY> is the domain class for replies
  * @author Maja Pesic
  */
-public class AsynchronousRequestor<REQUEST, REPLY> {
+public class AsynchronousRequestor<REQUEST, REPLY>
+{
 
     /**
      * Class Pair is just used to make it possible to store pairs of REQUEST,
      * ReplyListener in a hashtable!
      */
-    private class Pair {
+    private class Pair
+    {
 
         private IReplyListener<REQUEST, REPLY> listener;
         private REQUEST request;
 
-        private Pair(IReplyListener<REQUEST, REPLY> listener, REQUEST request) {
+        private Pair(IReplyListener<REQUEST, REPLY> listener, REQUEST request)
+        {
             this.listener = listener;
             this.request = request;
         }
@@ -60,19 +64,19 @@ public class AsynchronousRequestor<REQUEST, REPLY> {
      * @param serializer
      * @throws java.lang.Exception
      */
-    public AsynchronousRequestor(String requestSenderQueue, String replyReceiverQueue, IRequestReplySerializer<REQUEST, REPLY> serializer) throws Exception {
+    public AsynchronousRequestor(String requestSenderQueue, String replyReceiverQueue, IRequestReplySerializer<REQUEST, REPLY> serializer) 
+            throws Exception
+    {
         this.serializer = serializer;
         this.listeners = new HashMap<>();
 
         gateway = new MessagingGateway(requestSenderQueue, replyReceiverQueue);
-        gateway.setListener(new MessageListener() {
+        gateway.setListener(new MessageListener()
+        {
             @Override
-            public void onMessage(Message message) {
-                try {
-                    onReply((TextMessage) message);
-                } catch (JMSException ex) {
-                    Logger.getLogger(AsynchronousRequestor.class.getName()).log(Level.SEVERE, null, ex);
-                }
+            public void onMessage(Message message)
+            {
+                onReply((TextMessage) message);
             }
         });
     }
@@ -80,15 +84,23 @@ public class AsynchronousRequestor<REQUEST, REPLY> {
     /**
      * Opens JMS connection in order to be able to send messages and to start
      * receiving messages.
-     *
-     * @throws javax.jms.JMSException
+     * @throws messaging.GatewayException
      */
-    public void start() throws JMSException {
-        gateway.start();
+    public void start() 
+            throws GatewayException
+    {
+        try
+        {
+            gateway.start();
+        }
+        catch (JMSException ex)
+        {
+            throw new GatewayException("An error has occured in starting the asynchronous replier.", ex);
+        }
     }
 
     /**
-     * @throws javax.jms.JMSException
+     * @throws messaging.GatewayException
      * @todo implement this method! Sends one request. Immediately, a listener
      * is registered for this request. This listener will be notified when
      * (later) a reply for this request arrives. This method should: 1. create a
@@ -101,13 +113,22 @@ public class AsynchronousRequestor<REQUEST, REPLY> {
      * @param listener is the listener that will be notified when the reply
      * arrives for this request
      */
-    public synchronized void sendRequest(REQUEST request, IReplyListener<REQUEST, REPLY> listener) throws JMSException {
-        String body = serializer.requestToString(request);
-        Message requestMessage = gateway.createMessage(body);
-        requestMessage.setJMSReplyTo(gateway.getConsumerDestination());
-        gateway.sendMessage(requestMessage);
-        Pair pair = new Pair(listener, request);
-        listeners.put(requestMessage.getJMSMessageID(), pair);
+    public synchronized void sendRequest(REQUEST request, IReplyListener<REQUEST, REPLY> listener) 
+            throws GatewayException
+    {
+        try
+        {
+            String body = serializer.requestToString(request);
+            Message requestMessage = gateway.createMessage(body);
+            requestMessage.setJMSReplyTo(gateway.getConsumerDestination());
+            gateway.sendMessage(requestMessage);
+            Pair pair = new Pair(listener, request);
+            listeners.put(requestMessage.getJMSMessageID(), pair);
+        }
+        catch (JMSException ex)
+        {
+            throw new GatewayException("An error has occured in sending a request.", ex);
+        }
     }
 
     /**
@@ -119,10 +140,18 @@ public class AsynchronousRequestor<REQUEST, REPLY> {
      * unregister the listener
      * @param message the reply message
      */
-    private synchronized void onReply(TextMessage message) throws JMSException {
-        Pair pair = listeners.get(message.getJMSCorrelationID());
-        REPLY reply = this.serializer.replyFromString(message.getText());
-        pair.listener.onReply(pair.request, reply);
-        listeners.remove(reply);
+    private synchronized void onReply(TextMessage message)
+    {
+        try
+        {
+            Pair pair = listeners.get(message.getJMSCorrelationID());
+            REPLY reply = serializer.replyFromString(message.getText());
+            pair.listener.onReply(pair.request, reply);
+            listeners.remove(message.getJMSCorrelationID());
+        }
+        catch (JMSException ex)
+        {
+            Logger.getLogger(AsynchronousRequestor.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 }

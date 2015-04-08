@@ -28,7 +28,6 @@ public class ClientSerializer implements IRequestReplySerializer<ClientRequest, 
      * @return the ClientRequest containng the same information like the given
      * XML (str)
      */
-    @Override
     public ClientRequest requestFromString(String str)
     {
         return (ClientRequest) xstream.fromXML(str);
@@ -41,7 +40,6 @@ public class ClientSerializer implements IRequestReplySerializer<ClientRequest, 
      * @return the ClientReply containng the same information like the given XML
      * (str)
      */
-    @Override
     public ClientReply replyFromString(String str)
     {
         return (ClientReply) xstream.fromXML(str);
@@ -53,7 +51,6 @@ public class ClientSerializer implements IRequestReplySerializer<ClientRequest, 
      * @param request is the ClientRequest to be serialized into XML
      * @return the string containing XML with information about the request
      */
-    @Override
     public String requestToString(ClientRequest request)
     {
         return xstream.toXML(request);
@@ -65,7 +62,6 @@ public class ClientSerializer implements IRequestReplySerializer<ClientRequest, 
      * @param reply is the ClientReply to be serialized into XML
      * @return the string containing XML with information about the rereply
      */
-    @Override
     public String replyToString(ClientReply reply)
     {
         return xstream.toXML(reply);

@@ -3,13 +3,13 @@ package messaging.requestreply;
 import java.util.HashMap;
 import javax.jms.Message;
 import javax.jms.TextMessage;
-import java.util.Hashtable;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.jms.Destination;
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
+import messaging.GatewayException;
 import messaging.MessagingGateway;
 
 /**
@@ -18,7 +18,8 @@ import messaging.MessagingGateway;
  * @param <REPLY>
  * @author Maja Pesic
  */
-public class AsynchronousReplier<REQUEST, REPLY> {
+public class AsynchronousReplier<REQUEST, REPLY>
+{
 
     /**
      * For sending and receiving messages
@@ -49,13 +50,17 @@ public class AsynchronousReplier<REQUEST, REPLY> {
      * @param serializer used to de-serialize REQUESTs and serialize REPLIES.
      * @throws java.lang.Exception
      */
-    public AsynchronousReplier(String requestReceiverQueue, IRequestReplySerializer<REQUEST, REPLY> serializer) throws Exception {
+    public AsynchronousReplier(String requestReceiverQueue, IRequestReplySerializer<REQUEST, REPLY> serializer)
+            throws Exception
+    {
         this.serializer = serializer;
         this.gateway = new MessagingGateway(null, requestReceiverQueue);
-        this.gateway.setListener(new MessageListener() {
+        this.gateway.setListener(new MessageListener()
+        {
 
             @Override
-            public void onMessage(Message message) {
+            public void onMessage(Message message)
+            {
                 onRequest((TextMessage) message);
             }
         });
@@ -67,16 +72,32 @@ public class AsynchronousReplier<REQUEST, REPLY> {
      *
      * @param requestListener
      */
-    public void setRequestListener(IRequestListener<REQUEST> requestListener) {
+    public void setRequestListener(IRequestListener<REQUEST> requestListener)
+    {
         this.requestListener = requestListener;
     }
 
     /**
      * Opens the jms connection of the Messaging Gateway in order to start
      * sending/receiving requests.
+     *
+     * @throws messaging.GatewayException
      */
-    public void start() throws JMSException {
-        gateway.start();
+    public void start()
+            throws GatewayException
+    {
+        try
+        {
+            gateway.start();
+        }
+        catch (JMSException ex)
+        {
+            throw new GatewayException("An error has occured in starting the asynchronous replier.", ex);
+        }
+    }
+
+    public void beforeReply(Message request, Message reply)
+    {
     }
 
     /**
@@ -87,12 +108,16 @@ public class AsynchronousReplier<REQUEST, REPLY> {
      * listener about the REQUEST arrival
      * @param message the incomming message containing the request
      */
-    private synchronized void onRequest(TextMessage message) {
-        try {
-            REQUEST request = this.serializer.requestFromString(message.getText());
-            this.activeRequests.put(request, message);
+    private synchronized void onRequest(TextMessage message)
+    {
+        try
+        {
+            REQUEST request = serializer.requestFromString(message.getText());
+            activeRequests.put(request, message);
             requestListener.receivedRequest(request);
-        } catch (JMSException ex) {
+        }
+        catch (JMSException ex)
+        {
             Logger.getLogger(AsynchronousReplier.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
@@ -100,28 +125,30 @@ public class AsynchronousReplier<REQUEST, REPLY> {
     /**
      * Sends the reply for a specific request.
      *
-     * @throws javax.jms.JMSException
-     * @todo implement the following: 1. get the requestMessage registered for
-     * the request from activeRequests 2. serialize the reply and create the
-     * replyMessage for it 3. set the JMSCorrelationID of the replyMessage to be
-     * equal to the JMSMessageID of the requestMessage 4. get the getJMSReplyTo
-     * destination of the requestMessage 5. send the replyMessage to this
-     * Destination; use method send(Message m, Destination d) in
-     * MessagingGateway
-     *
      * @param request to which this reply belongs
      * @param reply to the request
      * @return true if the reply is sent succefully; false if sending reply
      * fails
+     * @throws messaging.GatewayException
      */
-    public synchronized boolean sendReply(REQUEST request, REPLY reply) throws JMSException {
-        Message requestMessage = activeRequests.get(request);
-        String replyBody = serializer.replyToString(reply);
-        Message replyMessage = gateway.createMessage(replyBody);
-        replyMessage.setJMSCorrelationID(requestMessage.getJMSMessageID());
-        Destination destination = requestMessage.getJMSReplyTo();
-        gateway.sendMessage(destination, replyMessage);
-        activeRequests.remove(request);
-        return true;
+    public synchronized boolean sendReply(REQUEST request, REPLY reply)
+            throws GatewayException
+    {
+        try
+        {
+            Message requestMessage = activeRequests.get(request);
+            String replyBody = serializer.replyToString(reply);
+            Message replyMessage = gateway.createMessage(replyBody);
+            replyMessage.setJMSCorrelationID(requestMessage.getJMSMessageID());
+            Destination destination = requestMessage.getJMSReplyTo();
+            beforeReply(requestMessage, replyMessage);
+            gateway.sendMessage(destination, replyMessage);
+            activeRequests.remove(request);
+            return true;
+        }
+        catch (JMSException ex)
+        {
+            throw new GatewayException("An error has occured in sending a reply.", ex);
+        }
     }
 }

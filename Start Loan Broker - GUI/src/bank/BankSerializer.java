@@ -30,7 +30,6 @@ public class BankSerializer implements IRequestReplySerializer<BankQuoteRequest,
      * @return the BankRequest containng the same information like the given XML
      * (str)
      */
-    @Override
     public BankQuoteRequest requestFromString(String str)
     {
         return (BankQuoteRequest) xstream.fromXML(str);
@@ -43,7 +42,6 @@ public class BankSerializer implements IRequestReplySerializer<BankQuoteRequest,
      * @return the BankReply containng the same information like the given XML
      * (str)
      */
-    @Override
     public BankQuoteReply replyFromString(String str)
     {
         return (BankQuoteReply) xstream.fromXML(str);
@@ -55,7 +53,6 @@ public class BankSerializer implements IRequestReplySerializer<BankQuoteRequest,
      * @param request is the BankRequest to be serialized into XML
      * @return the string containing XML with information about the request
      */
-    @Override
     public String requestToString(BankQuoteRequest request)
     {
         return xstream.toXML(request);
@@ -64,10 +61,9 @@ public class BankSerializer implements IRequestReplySerializer<BankQuoteRequest,
     /**
      * Serializes a BankReply into XML string.
      *
-     * @param reply
+     * @param request is the BankReply to be serialized into XML
      * @return the string containing XML with information about the reply
      */
-    @Override
     public String replyToString(BankQuoteReply reply)
     {
         return xstream.toXML(reply);
